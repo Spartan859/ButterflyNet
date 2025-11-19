@@ -1,0 +1,9 @@
+nvidia-cublas-cu12==12.4.5.8
+numpy==1.26.4
+scikit-learn
+pillow
+matplotlib
+seaborn
+tqdm
+opencv-python
+librosa

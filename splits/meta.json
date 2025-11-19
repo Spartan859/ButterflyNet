@@ -1,0 +1,8 @@
+{
+  "dataset_root": "/mlp_vepfs/share/lxy/ButterflyNet/ButterflyClassificationDataset",
+  "val_ratio": 0.2,
+  "seed": 42,
+  "num_classes": 50,
+  "num_train": 3585,
+  "num_val": 894
+}
