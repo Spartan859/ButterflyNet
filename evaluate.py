@@ -53,10 +53,24 @@ def build_loader(
     )
 
 
-def load_checkpoint(checkpoint: Path, num_classes: int, device: torch.device) -> nn.Module:
-    model = create_model(num_classes=num_classes)
+def load_checkpoint(checkpoint: Path, num_classes: int, device: torch.device, model_variant: str = "auto") -> nn.Module:
     data = torch.load(checkpoint, map_location=device)
-    state_dict = data.get("model_state", data)  # tolerate raw state dict
+    # Determine variant & dropout from checkpoint metadata when available
+    if isinstance(data, dict):
+        ckpt_variant = data.get("model_variant", None)
+        ckpt_dropout = float(data.get("dropout_p", 0.0)) if data.get("dropout_p", None) is not None else 0.0
+        state_dict = data.get("model_state", data)
+    else:
+        ckpt_variant = None
+        ckpt_dropout = 0.0
+        state_dict = data
+
+    if model_variant == "auto":
+        resolved_variant = ckpt_variant or "baseline"
+    else:
+        resolved_variant = model_variant
+
+    model = create_model(num_classes=num_classes, dropout_p=ckpt_dropout, model_variant=resolved_variant)
     model.load_state_dict(state_dict)
     model.to(device)
     model.eval()
@@ -142,6 +156,7 @@ def main():
     parser.add_argument("--device", type=str, default="cuda" if torch.cuda.is_available() else "cpu")
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--limit_val_batches", type=int, default=None)
+    parser.add_argument("--model_variant", type=str, default="auto", choices=["auto", "baseline", "deep"], help="Model variant. 'auto' tries to read from checkpoint metadata.")
     parser.add_argument("--out_json", type=Path, default=Path("analysis/metrics/val_metrics.json"))
     parser.add_argument("--out_report", type=Path, default=Path("analysis/metrics/classification_report.txt"))
     parser.add_argument("--out_cm", type=Path, default=Path("analysis/figures/confusion_matrix.png"))
@@ -164,7 +179,7 @@ def main():
         args.num_workers,
     )
 
-    model = load_checkpoint(args.checkpoint, num_classes=len(class_mapping), device=device)
+    model = load_checkpoint(args.checkpoint, num_classes=len(class_mapping), device=device, model_variant=args.model_variant)
     preds, labels = run_inference(model, loader, device, limit_batches=args.limit_val_batches)
     metrics = compute_metrics(preds, labels)
 

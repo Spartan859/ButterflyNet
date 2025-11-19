@@ -47,8 +47,39 @@ class ButterflyNet(nn.Module):
         return self.classifier(x)
 
 
-def create_model(num_classes: int = 50, dropout_p: float = 0.0) -> ButterflyNet:
-    return ButterflyNet(num_classes=num_classes, dropout_p=dropout_p)
+class ButterflyNetDeep(nn.Module):
+    """Deeper CNN: add a 4th conv block for higher capacity (3->32->64->128->256).
+
+    Keeps GAP to control parameter count; classifier maps 256->num_classes.
+    """
+
+    def __init__(self, num_classes: int = 50, dropout_p: float = 0.0):
+        super().__init__()
+        self.features = nn.Sequential(
+            ConvBlock(3, 32),    # -> 32 x 112 x 112
+            ConvBlock(32, 64),   # -> 64 x 56 x 56
+            ConvBlock(64, 128),  # -> 128 x 28 x 28
+            ConvBlock(128, 256), # -> 256 x 14 x 14
+            ConvBlock(256, 512), # -> 512 x 7 x 7
+        )
+        self.gap = nn.AdaptiveAvgPool2d((1, 1))
+        self.dropout = nn.Dropout(p=dropout_p) if dropout_p and dropout_p > 0.0 else nn.Identity()
+        self.classifier = nn.Linear(512, num_classes)
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        x = self.features(x)
+        x = self.gap(x).view(x.size(0), -1)
+        x = self.dropout(x)
+        return self.classifier(x)
+
+
+def create_model(num_classes: int = 50, dropout_p: float = 0.0, model_variant: str = "baseline") -> nn.Module:
+    variant = (model_variant or "baseline").lower()
+    if variant == "baseline":
+        return ButterflyNet(num_classes=num_classes, dropout_p=dropout_p)
+    elif variant in ("deep", "deeper"):
+        return ButterflyNetDeep(num_classes=num_classes, dropout_p=dropout_p)
+    else:
+        raise ValueError(f"Unknown model_variant: {model_variant}")
 
 
 if __name__ == "__main__":

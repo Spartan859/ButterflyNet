@@ -45,5 +45,5 @@ exec python -m torch.distributed.run \
   --train_csv "${TRAIN_CSV}" \
   --val_csv "${VAL_CSV}" \
   --stats "${STATS}" \
-  --epochs 100 \
+  --epochs 50 \
   "$@"

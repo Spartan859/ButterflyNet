@@ -1,0 +1,7 @@
+Baseline ButterflyNet (input 3x224x224)
+  [Conv3x3 3->32] + BN + ReLU + MaxPool2  -> 32x112x112
+  [Conv3x3 32->64] + BN + ReLU + MaxPool2 -> 64x56x56
+  [Conv3x3 64->128] + BN + ReLU + MaxPool2->128x28x28
+  AdaptiveAvgPool(1x1) -> 128
+  (Dropout p=?) optional
+  Linear 128->50 (logits)

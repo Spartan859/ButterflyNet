@@ -200,6 +200,7 @@ def main():
     parser.add_argument("--aug", action="store_true", help="Use data augmentations for training")
     parser.add_argument("--aug_mode", type=str, default="full", choices=["full", "simple"], help="Augmentation mode: full (multi-op) or simple (single flip)")
     parser.add_argument("--dropout_p", type=float, default=0.0, help="Dropout probability applied before classifier (0 to disable)")
+    parser.add_argument("--model_variant", type=str, default="baseline", choices=["baseline", "deep"], help="Model architecture variant")
     args = parser.parse_args()
 
     set_seeds(args.seed)
@@ -223,7 +224,7 @@ def main():
         aug_mode=args.aug_mode,
     )
 
-    model = create_model(num_classes=num_classes, dropout_p=args.dropout_p).to(device)
+    model = create_model(num_classes=num_classes, dropout_p=args.dropout_p, model_variant=args.model_variant).to(device)
     if is_distributed:
         model = DDP(model, device_ids=[local_rank] if device.type == "cuda" else None)
     optimizer = Adam(model.parameters(), lr=args.lr)
@@ -271,6 +272,8 @@ def main():
             # unwrap model if DDP
             model_state = model.module.state_dict() if isinstance(model, DDP) else model.state_dict()
             tag_parts = []
+            if args.model_variant and args.model_variant != "baseline":
+                tag_parts.append(args.model_variant)
             tag_parts.append(f"aug-{args.aug_mode}" if args.aug else "baseline")
             if args.dropout_p and args.dropout_p > 0.0:
                 tag_parts.append(f"drop{args.dropout_p:.2f}")
@@ -285,6 +288,7 @@ def main():
                 "aug": args.aug,
                 "aug_mode": args.aug_mode,
                 "dropout_p": args.dropout_p,
+                "model_variant": args.model_variant,
             }, args.out_dir, f"{tag}_best_{start}.pt")
             print(f"Saved new best checkpoint: {ckpt_path}")
 
@@ -296,6 +300,8 @@ def main():
     # Save training history
     if is_main_process(rank):
         tag_bits = []
+        if args.model_variant and args.model_variant != "baseline":
+            tag_bits.append(args.model_variant)
         if args.aug:
             tag_bits.append(f"aug-{args.aug_mode}")
         if args.dropout_p and args.dropout_p > 0.0:

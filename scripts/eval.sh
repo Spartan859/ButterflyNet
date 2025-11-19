@@ -23,14 +23,19 @@ if [[ -z "${CKPT}" ]]; then
 fi
 
 echo "[eval] Using checkpoint: ${CKPT}"
-python evaluate.py \
-  --checkpoint "${CKPT}" \
-  --dataset_root "${DATASET_ROOT}" \
-  --val_csv "${VAL_CSV}" \
-  --stats "${STATS}" \
-  --out_json analysis/metrics/val_metrics.json \
-  --out_report analysis/metrics/classification_report.txt \
-  --out_cm analysis/figures/confusion_matrix.png \
-  "$@"
 
-echo "[eval] Done. Metrics: analysis/metrics/val_metrics.json; CM: analysis/figures/confusion_matrix.png"
+# Extract checkpoint basename (remove directory and .pt extension)
+CKPT_BASENAME=$(basename "${CKPT}")
+CKPT_SUFFIX="${CKPT_BASENAME%.pt}"
+
+python evaluate.py \
+    --checkpoint "${CKPT}" \
+    --dataset_root "${DATASET_ROOT}" \
+    --val_csv "${VAL_CSV}" \
+    --stats "${STATS}" \
+    --out_json "analysis/metrics/val_metrics_${CKPT_SUFFIX}.json" \
+    --out_report "analysis/metrics/classification_report_${CKPT_SUFFIX}.txt" \
+    --out_cm "analysis/figures/confusion_matrix_${CKPT_SUFFIX}.png" \
+    "$@"
+
+echo "[eval] Done. Metrics: analysis/metrics/val_metrics_${CKPT_SUFFIX}.json; CM: analysis/figures/confusion_matrix_${CKPT_SUFFIX}.png"

@@ -1,0 +1,9 @@
+Deep ButterflyNet (input 3x224x224)
+  [Conv3x3 3->32] + BN + ReLU + MaxPool2   -> 32x112x112
+  [Conv3x3 32->64] + BN + ReLU + MaxPool2  -> 64x56x56
+  [Conv3x3 64->128] + BN + ReLU + MaxPool2 ->128x28x28
+  [Conv3x3 128->256] + BN + ReLU + MaxPool2->256x14x14
+  [Conv3x3 256->512] + BN + ReLU + MaxPool2->512x7x7
+  AdaptiveAvgPool(1x1) -> 512
+  (Dropout p=?) optional
+  Linear 512->50 (logits)
