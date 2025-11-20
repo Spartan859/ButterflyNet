@@ -13,7 +13,7 @@ pip install nvidia-cublas-cu12==12.4.5.8
 ```
 
 ## 数据准备 (Data)
-- 数据根目录默认：`ButterflyClassificationDataset/`（本仓库已提供同名目录或压缩包）。
+- 数据根目录默认：`ButterflyClassificationDataset/`。
 - 如需从文件夹结构重新生成切分：
 ```bash
 # 生成 8:2 训练/验证划分（固定 Seed=42）
@@ -122,6 +122,27 @@ python scripts/export_to_onnx.py \
 	--checkpoint checkpoints/deep_baseline_best_YYYYmmdd_HHMMSS.pt \
 	--model_variant deep --dropout_p 0.20 --num_classes 50 \
 	--output checkpoints/deep_baseline_best_YYYYmmdd_HHMMSS.onnx
+```
+
+## 可解释性（Grad-CAM）
+使用 Grad-CAM 观察模型在图像上的关注区域，验证可靠性并解释决策依据。
+
+- 脚本：`scripts/grad_cam.py`
+- 说明：默认解释 Top-1 预测类别；需与训练一致地传入 `--model_variant` 与 `--dropout_p`。
+
+示例用法：
+```bash
+# 以 deep + drop0.20 最优权重为例，随机抽取 6 张验证集样本生成覆盖图
+CHECKPOINT=checkpoints/deep_baseline_drop0.20_best_YYYYmmdd_HHMMSS.pt \
+python scripts/grad_cam.py \
+	--checkpoint "$CHECKPOINT" \
+	--model_variant deep \
+	--dropout_p 0.20 \
+	--dataset_root ButterflyClassificationDataset \
+	--val_csv splits/val.csv \
+	--stats src/data/dataset_stats.json \
+	--num_samples 6 \
+	--out_dir analysis/figures/gradcam
 ```
 
 ## 复现实验清单 (Recipes)

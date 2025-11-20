@@ -3,7 +3,7 @@
 本项目选用 PyTorch 作为深度学习框架，使用torchrun进行方便的多卡分布式训练。
 
 ## 卷积神经网络模型设计
-设计了两个版本的模型，baseline和deep。后续会阐释为什么设计了两个版本。
+设计了两个版本的模型，baseline和deep。
 ### baseline
 ![alt text](analysis/figures/baseline.onnx.png)
 ### deep
@@ -217,7 +217,51 @@ Deep + Aug-Full
 
 结论：
 - 将 Aug-Simple 作为默认增强策略，优先获取稳定收益；在需要更高鲁棒性（背景/光照变化大）场景下再切换 Aug-Full。
-- 与前述 Dropout p≈0.20 的配置建议组合做小范围网格搜索（如 Aug-Simple × p∈[0.15, 0.25]），以验证二者协同作用对长尾类别的进一步提升。
+- 展望：可以与前述 Dropout p≈0.20 的配置建议组合做小范围网格搜索（如 Aug-Simple × p∈[0.15, 0.25]），以验证二者协同作用对长尾类别的进一步提升。
+
+## 基于Grad-CAM的可解释性验证
+
+方法概述：Grad-CAM 通过目标类别的梯度对最后一个卷积层的特征图进行加权，得到类相关的热力图，以解释模型关注区域。设最后一层卷积特征为 A_k、目标类别 c 的得分为 y^c，则权重 $\alpha_k^c = \text{GAP}\left( \frac{\partial y^c}{\partial A_k} \right)$，热力图 $L^c = \text{ReLU}\left( \sum_k \alpha_k^c A_k \right)$。我们对热力图进行归一化并叠加到原图上观察模型决策依据。
+
+实现细节：
+- 目标层：`ButterflyNetDeep` 的最后一个卷积块输出（通道 512）。
+- 钩子：前向保存特征图，反向保存梯度；对梯度做全局平均得到通道权重。
+- 预处理：使用 `src/data/dataset_stats.json` 归一化，输入 224×224；默认解释 Top-1 预测类别（可选指定类别）。
+- 可视化：将热力图插值至输入大小，使用 `jet` 颜色映射叠加到原图并导出 PNG。
+- 脚本位置：`scripts/grad_cam.py`。
+
+示例（Deep + Dropout p=0.20，验证集样例）：
+
+![gradcam 0](analysis/figures/gradcam/gradcam_deep_deep_baseline_drop0.20_best_20251119_173233_00.png)
+![gradcam 1](analysis/figures/gradcam/gradcam_deep_deep_baseline_drop0.20_best_20251119_173233_01.png)
+![gradcam 2](analysis/figures/gradcam/gradcam_deep_deep_baseline_drop0.20_best_20251119_173233_02.png)
+![gradcam 3](analysis/figures/gradcam/gradcam_deep_deep_baseline_drop0.20_best_20251119_173233_03.png)
+![gradcam 4](analysis/figures/gradcam/gradcam_deep_deep_baseline_drop0.20_best_20251119_173233_04.png)
+![gradcam 5](analysis/figures/gradcam/gradcam_deep_deep_baseline_drop0.20_best_20251119_173233_05.png)
+
+主要结论：
+- 关注一致性：热力图高响应区域集中在蝴蝶翅膀的纹理与边缘位置（条纹/斑点/轮廓），而对背景叶片、枝干的响应显著抑制，说明模型决策依据与人类直觉一致，可靠性较好。
+- 过拟合缓解：与无 Dropout 的可视化对比（未贴图）相比，p≈0.20 的模型对背景高光/阴影的非目标响应减弱，显示出 Dropout 对背景伪线索的抑制作用，与指标提升（Accuracy/F1）一致。
+- 失败样例特征：个别错分样例中，热力图集中在躯干或背景颜色块而非翅膀细纹，提示需要更强的形状/纹理增强（如更大的旋转/尺度扰动）或更细粒度数据清洗。
+
+复现与使用：Grad-CAM 的命令行用法已整理至 `README.md` 的“可解释性（Grad-CAM）”小节，便于直接复制运行。
+
+Grad-CAM 显示当前模型主要依赖翅膀纹理与轮廓等判别性区域进行分类，且在加入适度 Dropout（p≈0.20）后对背景伪线索的依赖进一步降低，支持“Dropout 改善泛化”的结论。结合增强（Aug-Simple/Aug-Full）与 Grad-CAM 的一致性，可认为改进策略确实提升了模型的可解释性与可靠性。
+
+## 结论与展望
+
+- 主要结论：本项目基于 PyTorch 自主实现数据加载、训练与评估流程（Seed=42 全流程可复现）。深层模型（5 个卷积块，512 通道）相较基线（3 个卷积块，128 通道）显著提升验证集表现（Accuracy≈0.80，Weighted F1≈0.80）。
+- 正则与增强：对 Deep 模型在 GAP 前加入适度 Dropout（p≈0.20）获得稳定增益；数据增强方面，Aug-Simple/Full 均优于 No-Aug，其中 Aug-Simple 在 Accuracy/F1 上略优、风险更低。
+- 可解释性：Grad-CAM 显示模型关注集中在蝴蝶翅膀纹理与轮廓，背景响应被抑制；在 p≈0.20 下对背景伪线索依赖进一步降低，支撑“正则化改善泛化”的结论。
+- 局限与观察：仍存在少数长尾类别 Recall 偏低、相似纹理类间混淆等问题；Aug-Full 在部分小样本类上偶见轻微欠拟合迹象；训练曲线显示中后期仍可能出现局部震荡。
+
+- 后续工作（改进方向）：
+    - 数据层：补充更丰富的形状/纹理增强（RandomErasing、Cutout）、混合策略（Mixup/CutMix）、更稳健的颜色扰动；按类别统计制定“难例回放/重采样”。
+    - 正则与损失：细化 Dropout 网格（p∈[0.15,0.25]，步长0.02–0.03），尝试 Label Smoothing、Focal Loss/类重加权以缓解类别不均衡。
+    - 优化与调度：OneCycleLR/CosineAnnealing 结合 Warmup，对比 ReduceLROnPlateau；更长训练（配合早停）验证上界。
+    - 结构改进：替换激活（SiLU/GELU）、用 stride=2 Conv 替代 Pooling 对比速度/精度；轻量化压缩（蒸馏、剪枝、量化），在不显著损失性能前提下降本。
+    - 可解释与可靠性：扩展 Integrated Gradients/SmoothGrad、类原型可视化；评估校准度（ECE），必要时引入温度缩放以改善置信度可靠性。
+    - 迁移与部署：探索预训练（如 ResNet18/34 迁移学习）与特征冻结微调做上限参考；
 
 ## 遇到的问题与解决方案
 
