@@ -7,3 +7,4 @@ seaborn
 tqdm
 opencv-python
 librosa
+onnx
