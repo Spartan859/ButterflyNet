@@ -35,7 +35,7 @@ env/
 .ipynb_checkpoints
 
 # PyTorch/TensorFlow checkpoints
-*.pt
+# *.pt
 *.pth
 *.ckpt
 
